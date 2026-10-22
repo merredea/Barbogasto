@@ -5,7 +5,7 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "barbogasto"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "56ac98c3-0927-46dd-b403-4872e8c9f4c9"
 migrations_dir = "migrations"
 
 [vars]
