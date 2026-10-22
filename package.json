@@ -1,0 +1,35 @@
+{
+  "name": "barbogasto",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "wrangler pages dev public --port 8788 --ip 127.0.0.1 --persist-to .wrangler/state",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.functions.json --noEmit",
+    "test": "vitest run",
+    "db:migrate:local": "wrangler d1 migrations apply barbogasto --local --persist-to .wrangler/state",
+    "db:migrate:remote": "wrangler d1 migrations apply barbogasto --remote",
+    "deploy": "npm run build && wrangler pages deploy dist",
+    "deploy:cron": "wrangler deploy -c cron/wrangler.toml",
+    "vapid": "node scripts/generate-vapid.mjs",
+    "icons": "node scripts/generate-icons.mjs"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261022.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.152.0"
+  }
+}

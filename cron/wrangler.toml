@@ -1,0 +1,16 @@
+name = "barbogasto-reminder"
+main = "src/index.ts"
+compatibility_date = "2026-10-22"
+
+# 07:00 UTC cae por la mañana en España (08:00 o 09:00).
+# El código comprueba si esa fecha es el último día del mes en la zona del grupo.
+[triggers]
+crons = ["0 7 28-31 * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "barbogasto"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[vars]
+VAPID_SUBJECT = "mailto:barbogasto@localhost"

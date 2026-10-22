@@ -1,0 +1,13 @@
+name = "barbogasto"
+compatibility_date = "2026-10-22"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "barbogasto"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+VAPID_SUBJECT = "mailto:barbogasto@localhost"

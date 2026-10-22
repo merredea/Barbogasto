@@ -1,0 +1,88 @@
+name: Publicar
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Base D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          placeholder=00000000-0000-0000-0000-000000000000
+          if grep -q "$placeholder" wrangler.toml; then
+            if ! npx wrangler d1 create barbogasto --location weur > /tmp/d1.txt 2>&1; then
+              cat /tmp/d1.txt
+              npx wrangler d1 info barbogasto > /tmp/d1.txt
+            fi
+            id=$(grep -Eo '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' /tmp/d1.txt | grep -v "$placeholder" | head -1)
+            if [ -z "$id" ]; then
+              echo "No se ha podido leer el identificador de D1."
+              cat /tmp/d1.txt
+              exit 1
+            fi
+            perl -pi -e "s/$placeholder/$id/g" wrangler.toml cron/wrangler.toml
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add wrangler.toml cron/wrangler.toml
+            git commit -m "Guarda el identificador de la base D1"
+            git push
+          fi
+          npx wrangler d1 migrations apply barbogasto --remote
+      - name: Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler pages deploy dist --project-name barbogasto --commit-dirty=true
+      - name: Recordatorio mensual
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy -c cron/wrangler.toml
+      - name: Secretos
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          put_pages() {
+            if [ -n "$2" ]; then
+              printf '%s' "$2" | npx wrangler pages secret put "$1" --project-name barbogasto
+            fi
+          }
+          put_worker() {
+            if [ -n "$2" ]; then
+              printf '%s' "$2" | npx wrangler secret put "$1" -c cron/wrangler.toml
+            fi
+          }
+          put_pages GEMINI_API_KEY "$GEMINI_API_KEY"
+          put_pages VAPID_PUBLIC_KEY "$VAPID_PUBLIC_KEY"
+          put_pages VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
+          put_pages CRON_SECRET "$CRON_SECRET"
+          put_worker VAPID_PUBLIC_KEY "$VAPID_PUBLIC_KEY"
+          put_worker VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY"
+          put_worker CRON_SECRET "$CRON_SECRET"

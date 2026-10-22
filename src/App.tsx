@@ -1,0 +1,35 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+import { Layout } from "./components/Layout";
+import { Splash } from "./components/ui";
+import { BalancesPage } from "./pages/BalancesPage";
+import { ExpenseDetailPage } from "./pages/ExpenseDetailPage";
+import { ExpenseFormPage } from "./pages/ExpenseFormPage";
+import { ExpensesPage } from "./pages/ExpensesPage";
+import { HomePage } from "./pages/HomePage";
+import { InvitePage } from "./pages/InvitePage";
+import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { useSession } from "./session";
+
+export function App() {
+  const { me, loading } = useSession();
+  if (loading) return <Splash />;
+  return (
+    <Routes>
+      <Route path="/login" element={me ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/registro" element={me ? <Navigate to="/" replace /> : <RegisterPage />} />
+      <Route path="/invitar/:token" element={<InvitePage />} />
+      <Route element={me ? <Layout /> : <Navigate to="/login" replace />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/gastos" element={<ExpensesPage />} />
+        <Route path="/gastos/nuevo" element={<ExpenseFormPage />} />
+        <Route path="/gastos/:id" element={<ExpenseDetailPage />} />
+        <Route path="/gastos/:id/editar" element={<ExpenseFormPage />} />
+        <Route path="/saldos" element={<BalancesPage />} />
+        <Route path="/ajustes" element={<SettingsPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to={me ? "/" : "/login"} replace />} />
+    </Routes>
+  );
+}
