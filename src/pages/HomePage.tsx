@@ -3,22 +3,24 @@ import { Link } from "react-router-dom";
 import { formatCents, formatSignedCents } from "../../shared/money";
 import { formatSpanishDate, joinNames, todayIsoLocal } from "../../shared/text";
 import { api, type BalanceMember, type Expense, type Transfer } from "../lib/api";
-import { Banner } from "../components/ui";
+import { Banner, PageLoading } from "../components/ui";
 import { useSession } from "../session";
 
 export function HomePage() {
   const { me } = useSession();
   const [mine, setMine] = useState<BalanceMember | null>(null);
+  const [balancesLoaded, setBalancesLoaded] = useState(false);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Expense[] | null>(null);
   const [reminder, setReminder] = useState("");
 
   useEffect(() => {
     api.balances().then((data) => {
       setMine(data.members.find((member) => member.userId === me?.id) ?? null);
       setTransfers(data.transfers);
-    }).catch(() => undefined);
-    api.expenses(5).then((data) => setExpenses(data.expenses)).catch(() => undefined);
+      setBalancesLoaded(true);
+    }).catch(() => setBalancesLoaded(true));
+    api.expenses(5).then((data) => setExpenses(data.expenses)).catch(() => setExpenses([]));
     api.reminder().then((data) => setReminder(data.show ? data.message : "")).catch(() => undefined);
   }, [me?.id]);
 
@@ -43,15 +45,23 @@ export function HomePage() {
         </Banner>
       )}
       <section>
-        <p className={`text-base ${tone}`}>{sentence}</p>
-        <p className={`mt-1 text-5xl font-semibold tracking-tight ${tone}`}>{formatSignedCents(net)}</p>
+        {balancesLoaded ? (
+          <>
+            <p className={`text-base ${tone}`}>{sentence}</p>
+            <p className={`mt-1 text-5xl font-semibold tracking-tight ${tone}`}>{formatSignedCents(net)}</p>
+          </>
+        ) : (
+          <div className="skeleton h-[84px]" aria-hidden="true" />
+        )}
       </section>
       <Link to="/gastos/nuevo" className="flex h-12 items-center justify-center rounded-full bg-accent text-base font-semibold text-white">
         Añadir gasto
       </Link>
       <section>
         <h2 className="mb-3 text-xl font-semibold tracking-tight">Transferencias sugeridas</h2>
-        {transfers.length === 0 ? (
+        {!balancesLoaded ? (
+          <PageLoading rows={1} />
+        ) : transfers.length === 0 ? (
           <p className="rounded-2xl bg-card px-4 py-3 text-sm">No hay deudas pendientes.</p>
         ) : (
           <ul className="space-y-2">
@@ -69,7 +79,7 @@ export function HomePage() {
           <h2 className="text-xl font-semibold tracking-tight">Últimos gastos</h2>
           <Link className="text-sm font-semibold underline underline-offset-2" to="/gastos">Ver historial</Link>
         </div>
-        <ExpenseList expenses={expenses} empty="Todavía no hay gastos." />
+        {expenses === null ? <PageLoading rows={2} /> : <ExpenseList expenses={expenses} empty="Todavía no hay gastos." />}
       </section>
     </div>
   );
