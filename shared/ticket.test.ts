@@ -25,7 +25,7 @@ describe("ticket", () => {
     expect(draft.items[0].lineCents).toBe(500);
   });
 
-  it("convierte impuestos y descuentos en líneas y avisa si no cuadran", () => {
+  it("convierte los descuentos en líneas y avisa si no cuadran", () => {
     const draft = normalizeTicket({
       items: [{ name: "Menú", lineCents: 1000, confident: true }],
       taxCents: 210,
@@ -34,9 +34,101 @@ describe("ticket", () => {
       totalConfident: true,
       currency: "USD",
     });
-    expect(draft.items.map((item) => item.lineCents)).toEqual([1000, 210, -100]);
+    expect(draft.items.map((item) => item.lineCents)).toEqual([1000, -100]);
     expect(draft.currencyNeedsReview).toBe(true);
     expect(draft.warnings.some((warning) => warning.includes("no coincide"))).toBe(true);
+  });
+
+  it("no suma el IVA cuando ya viene incluido en los precios", () => {
+    const draft = normalizeTicket({
+      items: [
+        { name: "Caña", quantityMillis: 2000, unitPriceCents: 250, lineCents: 500, confident: true },
+        { name: "Pintxo", quantityMillis: 1000, unitPriceCents: 350, lineCents: 350, confident: true },
+      ],
+      taxCents: 73,
+      totalCents: 850,
+      totalConfident: true,
+    });
+    expect(draft.items.map((item) => item.name)).toEqual(["Caña", "Pintxo"]);
+    expect(draft.items.every((item) => item.kind === "item")).toBe(true);
+    expect(draft.taxCents).toBe(73);
+    expect(draft.warnings.some((warning) => warning.includes("no coincide"))).toBe(false);
+  });
+
+  it("reparte el IVA entre las líneas cuando el ticket declara un único tipo", () => {
+    const draft = normalizeTicket({
+      items: [
+        { name: "Menú", quantityMillis: 1000, unitPriceCents: 333, lineCents: 333, confident: true },
+        { name: "Café", quantityMillis: 1000, unitPriceCents: 667, lineCents: 667, confident: true },
+      ],
+      singleTaxRatePercent: 21,
+      taxCents: 210,
+      totalCents: 1210,
+      totalConfident: true,
+    });
+    expect(draft.items.map((item) => item.kind)).toEqual(["item", "item"]);
+    expect(draft.items.map((item) => item.lineCents)).toEqual([403, 807]);
+    expect(draft.items.map((item) => item.unitPriceCents)).toEqual([403, 807]);
+    expect(draft.items.every((item) => item.needsReview)).toBe(true);
+    expect(draft.taxCents).toBe(210);
+    expect(draft.warnings.some((warning) => warning.includes("aplicado su tipo a cada línea"))).toBe(true);
+    expect(draft.warnings.some((warning) => warning.includes("no coincide"))).toBe(false);
+  });
+
+  it("respeta tipos de IVA distintos por línea cuando el ticket los muestra", () => {
+    const draft = normalizeTicket({
+      items: [
+        { name: "Pan", quantityMillis: 1000, unitPriceCents: 1000, lineCents: 1000, taxRatePercent: 10, confident: true },
+        { name: "Taladro", quantityMillis: 1000, unitPriceCents: 1000, lineCents: 1000, taxRatePercent: 21, confident: true },
+      ],
+      taxCents: 310,
+      totalCents: 2310,
+      totalConfident: true,
+    });
+    expect(draft.items.map((item) => item.lineCents)).toEqual([1100, 1210]);
+    expect(draft.warnings.some((warning) => warning.includes("aplicado su tipo"))).toBe(true);
+    expect(draft.warnings.some((warning) => warning.includes("no coincide"))).toBe(false);
+  });
+
+  it("no inventa precios con IVA cuando hay varios tipos sin identificar", () => {
+    const draft = normalizeTicket({
+      items: [
+        { name: "Pan", lineCents: 1000, confident: true },
+        { name: "Taladro", lineCents: 1000, confident: true },
+      ],
+      taxCents: 155,
+      totalCents: 2155,
+      totalConfident: true,
+    });
+    expect(draft.items.map((item) => item.lineCents)).toEqual([1000, 1000]);
+    expect(draft.items.every((item) => item.needsReview)).toBe(true);
+    expect(draft.warnings.some((warning) => warning.includes("no se puede saber el tipo"))).toBe(true);
+  });
+
+  it("no deduce un tipo único de la cuota total: una mezcla puede dar el mismo promedio", () => {
+    const draft = normalizeTicket({
+      items: [
+        { name: "Menú", lineCents: 333, confident: true },
+        { name: "Café", lineCents: 667, confident: true },
+      ],
+      taxCents: 210,
+      totalCents: 1210,
+      totalConfident: true,
+    });
+    expect(draft.items.map((item) => item.lineCents)).toEqual([333, 667]);
+    expect(draft.items.every((item) => item.needsReview)).toBe(true);
+    expect(draft.warnings.some((warning) => warning.includes("no se puede saber el tipo"))).toBe(true);
+  });
+
+  it("acepta tipos de IVA fuera de los habituales", () => {
+    const draft = normalizeTicket({
+      items: [{ name: "Libro", lineCents: 2000, taxRatePercent: 5.5, confident: true }],
+      taxCents: 110,
+      totalCents: 2110,
+      totalConfident: true,
+    });
+    expect(draft.items[0].lineCents).toBe(2110);
+    expect(draft.warnings.some((warning) => warning.includes("aplicado su tipo"))).toBe(true);
   });
 
   it("descarta importes que no sean céntimos enteros", () => {

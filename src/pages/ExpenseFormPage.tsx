@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { computeSplit, type AdjustmentMode, type ItemKind, type SplitMode } from "../../shared/expense";
-import { centsToInput, formatCents, parseEurosToCents, parseQuantityMillis, uniqueSorted } from "../../shared/money";
+import { centsToInput, formatCents, parseEurosToCents, parseQuantityMillis, splitEvenly, uniqueSorted } from "../../shared/money";
 import { todayIsoLocal } from "../../shared/text";
 import type { TicketDraft } from "../../shared/ticket";
 import { ApiError, api, type Member } from "../lib/api";
@@ -42,6 +42,7 @@ export function ExpenseFormPage() {
   const [adjustmentMode, setAdjustmentMode] = useState<AdjustmentMode>("proportional");
   const [manual, setManual] = useState<Record<string, string>>({});
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [showLines, setShowLines] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [reconcile, setReconcile] = useState(false);
@@ -221,6 +222,10 @@ export function ExpenseFormPage() {
     }
   }
 
+  const linesSum = lines.reduce((sum, line) => sum + (parseEurosToCents(line.line) ?? 0), 0);
+  const totalCentsValue = parseEurosToCents(total);
+  const linesDifference = lines.length > 0 && totalCentsValue != null ? totalCentsValue - linesSum : 0;
+
   if (!loaded || !membersLoaded) return error ? <p className="text-sm text-muted">{error}</p> : <PageLoading rows={5} />;
 
   return (
@@ -259,7 +264,17 @@ export function ExpenseFormPage() {
           <Field label="Nota">
             <input className={controlClass} value={note} onChange={(event) => setNote(event.target.value)} />
           </Field>
-          {lines.map((line) => (
+          {lines.length > 0 && (
+            <button
+              className="flex w-full items-center justify-between rounded-2xl bg-card px-4 py-3 text-sm font-semibold"
+              type="button"
+              onClick={() => setShowLines((current) => !current)}
+            >
+              <span>{lines.length === 1 ? "1 producto leído" : `${lines.length} productos leídos`}</span>
+              <span className="text-pine">{showLines ? "Ocultar" : "Ver y corregir"}</span>
+            </button>
+          )}
+          {(showLines || lines.length === 0) && lines.map((line) => (
             <div key={line.key} className="space-y-2 rounded-2xl bg-card p-3">
               <input className={controlClass} value={line.name} aria-label="Producto" onChange={(event) => updateLine(line.key, { name: event.target.value })} />
               <div className="grid grid-cols-2 gap-2">
@@ -269,13 +284,15 @@ export function ExpenseFormPage() {
               <button className="text-sm font-semibold text-clay" type="button" onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>Quitar línea</button>
             </div>
           ))}
-          <button
-            className="text-sm font-semibold text-pine"
-            type="button"
-            onClick={() => setLines((current) => [...current, { key: crypto.randomUUID(), name: "", quantity: "1", unitPrice: "", line: "", kind: "item", participantIds: [], needsReview: false }])}
-          >
-            Añadir línea
-          </button>
+          {(showLines || lines.length === 0) && (
+            <button
+              className="text-sm font-semibold text-pine"
+              type="button"
+              onClick={() => setLines((current) => [...current, { key: crypto.randomUUID(), name: "", quantity: "1", unitPrice: "", line: "", kind: "item", participantIds: [], needsReview: false }])}
+            >
+              Añadir línea
+            </button>
+          )}
           <PrimaryButton type="button" onClick={() => setStep("people")}>Continuar</PrimaryButton>
         </div>
       )}
@@ -312,51 +329,76 @@ export function ExpenseFormPage() {
             <button type="button" className={`h-12 rounded-xl font-medium ${splitMode === "equal" ? "bg-pine text-white" : "bg-card"}`} onClick={() => setSplitMode("equal")}>A partes iguales</button>
             <button type="button" className={`h-12 rounded-xl font-medium ${splitMode === "items" ? "bg-pine text-white" : "bg-card"}`} onClick={() => setSplitMode("items")}>Por productos</button>
           </div>
-          {splitMode === "items" && lines.map((line) => (
-            <div key={line.key} className="rounded-2xl bg-card p-3">
-              <p className="font-medium">{line.name || "Línea"} · {line.line || "0,00"} €</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {participantIds.map((personId) => {
-                  const member = members.find((item) => item.id === personId);
-                  const selected = (line.participantIds.length ? line.participantIds : participantIds).includes(personId);
-                  return (
-                    <button
-                      key={personId}
-                      type="button"
-                      className={`rounded-full px-3 py-1 text-sm ${selected ? "bg-pine text-white" : "bg-paper"}`}
-                      onClick={() => {
-                        const current = line.participantIds.length ? line.participantIds : [...participantIds];
-                        const next = current.includes(personId) ? current.filter((item) => item !== personId) : [...current, personId];
-                        updateLine(line.key, { participantIds: next });
-                      }}
-                    >
-                      {member?.name}
-                    </button>
-                  );
-                })}
+          {splitMode === "items" && lines.length === 0 && (
+            <Banner>No hay productos en este gasto: vuelve atrás para añadirlos o reparte a partes iguales.</Banner>
+          )}
+          {splitMode === "items" && lines.map((line) => {
+            const assignedIds = line.participantIds.length ? line.participantIds : participantIds;
+            const lineCents = parseEurosToCents(line.line);
+            const shares = lineCents != null && assignedIds.length > 0 ? splitEvenly(lineCents, assignedIds.length) : null;
+            const minShare = shares ? Math.min(...shares) : 0;
+            const maxShare = shares ? Math.max(...shares) : 0;
+            return (
+              <div key={line.key} className="rounded-2xl bg-card p-3">
+                <p className="font-medium">{line.name || "Línea"} · {line.line || "0,00"} €</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {participantIds.map((personId) => {
+                    const member = members.find((item) => item.id === personId);
+                    const selected = assignedIds.includes(personId);
+                    return (
+                      <button
+                        key={personId}
+                        type="button"
+                        className={`rounded-full px-3 py-1 text-sm ${selected ? "bg-pine text-white" : "bg-paper"}`}
+                        onClick={() => {
+                          const current = line.participantIds.length ? line.participantIds : [...participantIds];
+                          const next = current.includes(personId) ? current.filter((item) => item !== personId) : [...current, personId];
+                          updateLine(line.key, { participantIds: next });
+                        }}
+                      >
+                        {member?.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {shares && assignedIds.length > 1 && (
+                  <p className="mt-2 text-sm text-muted">
+                    {minShare === maxShare ? `${formatCents(minShare)} por persona` : `${formatCents(minShare)} o ${formatCents(maxShare)} por persona`}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+          {splitMode === "items" && linesDifference !== 0 && (
+            <div className="space-y-2 rounded-2xl bg-card p-3">
+              <p className="text-sm">
+                Las líneas suman {formatCents(linesSum)} y el total es {formatCents(totalCentsValue ?? 0)}. ¿Cómo repartimos la diferencia de {formatCents(linesDifference)}?
+              </p>
+              <div className="flex gap-2">
+                <button type="button" className={`h-10 flex-1 rounded-xl text-sm ${adjustmentMode === "proportional" ? "bg-ink text-white" : "bg-paper"}`} onClick={() => setAdjustmentMode("proportional")}>Proporcional a lo pedido</button>
+                <button type="button" className={`h-10 flex-1 rounded-xl text-sm ${adjustmentMode === "manual" ? "bg-ink text-white" : "bg-paper"}`} onClick={() => setAdjustmentMode("manual")}>A mano</button>
               </div>
             </div>
-          ))}
-          {splitMode === "items" && (
-            <div className="flex gap-2">
-              <button type="button" className={`h-10 flex-1 rounded-xl text-sm ${adjustmentMode === "proportional" ? "bg-ink text-white" : "bg-card"}`} onClick={() => setAdjustmentMode("proportional")}>Impuestos proporcionales</button>
-              <button type="button" className={`h-10 flex-1 rounded-xl text-sm ${adjustmentMode === "manual" ? "bg-ink text-white" : "bg-card"}`} onClick={() => setAdjustmentMode("manual")}>Ajuste manual</button>
-            </div>
           )}
-          {splitMode === "items" && adjustmentMode === "manual" && participantIds.map((personId) => (
+          {splitMode === "items" && linesDifference !== 0 && adjustmentMode === "manual" && participantIds.map((personId) => (
             <Field key={personId} label={`Ajuste de ${members.find((member) => member.id === personId)?.name}`}>
               <input className={controlClass} inputMode="decimal" value={manual[personId] ?? "0,00"} onChange={(event) => setManual((current) => ({ ...current, [personId]: event.target.value }))} />
             </Field>
           ))}
           {preview && typeof preview !== "string" ? (
-            <ul className="space-y-2">
-              {preview.split.shares.map((share) => (
-                <li key={share.userId} className="flex justify-between rounded-2xl bg-card px-4 py-3">
-                  <span>{members.find((member) => member.id === share.userId)?.name}</span>
-                  <span className="font-semibold">{formatCents(share.shareCents)}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="sticky bottom-3 rounded-2xl bg-ink px-4 py-3 text-white shadow-lg">
+              <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+                {splitMode === "equal" ? "A partes iguales" : "Cada persona paga"}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                {preview.split.shares.map((share) => (
+                  <span key={share.userId} className="text-sm">
+                    {members.find((member) => member.id === share.userId)?.name}{" "}
+                    <span className="font-semibold">{formatCents(share.shareCents)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
           ) : (
             <Banner tone="error">{typeof preview === "string" ? preview : "Revisa el reparto."}</Banner>
           )}

@@ -16,13 +16,15 @@ export function Layout() {
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-20">
         <div className="relative mx-auto max-w-md border-t border-[#ebebeb] bg-white pb-[env(safe-area-inset-bottom)]">
-          <Link
-            to="/gastos/nuevo"
-            aria-label="Añadir gasto"
-            className={`absolute bottom-[calc(100%+10px)] left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-accent text-white shadow-[0_6px_16px_rgba(255,56,92,0.35)] ${adding ? "ring-2 ring-ink ring-offset-2" : ""}`}
-          >
-            <PlusIcon />
-          </Link>
+          {!adding && (
+            <Link
+              to="/gastos/nuevo"
+              aria-label="Añadir gasto"
+              className="absolute bottom-[calc(100%+10px)] left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-accent text-white shadow-[0_6px_16px_rgba(255,56,92,0.35)]"
+            >
+              <PlusIcon />
+            </Link>
+          )}
           <div className="flex">
             {items.map((item) => (
               <Tab key={item.to} item={item} pathname={pathname} />
