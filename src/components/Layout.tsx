@@ -11,7 +11,7 @@ export function Layout() {
   const adding = pathname === "/gastos/nuevo" || pathname.endsWith("/editar");
   return (
     <div className="mx-auto min-h-dvh w-full max-w-md bg-white">
-      <main className="px-5 pb-32 pt-8">
+      <main key={pathname} className="page-enter px-5 pb-32 pt-8">
         <Outlet />
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-20">
