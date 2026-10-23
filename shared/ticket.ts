@@ -73,7 +73,11 @@ export function normalizeTicket(raw: unknown): TicketDraft {
   const discount = readCents(source.discountCents);
   const tip = readCents(source.tipCents);
   const total = readCents(source.totalCents);
-  pushMoneyLine(items, "Impuestos", tax.value, "tax", tax.review);
+
+  // Los precios de línea se guardan tal como se pagan, con IVA incluido, y el total es el del
+  // ticket. El IVA nunca crea una línea extra: taxCents queda solo como información. Si una
+  // factura trae precios sin IVA y lo suma al final, la diferencia entre las líneas y el total
+  // se reparte al confirmar el gasto (proporcional a lo pedido o a mano).
   if (discount.value != null && discount.value !== 0) {
     pushMoneyLine(items, "Descuento", -Math.abs(discount.value), "discount", discount.review);
   }
