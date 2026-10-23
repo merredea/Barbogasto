@@ -29,7 +29,7 @@ export function ExpenseDetailPage() {
 
   if (!expense) return error ? <p className="text-sm text-muted">{error}</p> : <PageLoading rows={3} />;
   return (
-    <div className="space-y-4">
+    <div className="page-enter space-y-4">
       <Link to="/gastos" className="text-sm font-semibold text-pine">Volver</Link>
       <header>
         <h1 className="text-2xl font-semibold">{expense.merchant || expense.description}</h1>

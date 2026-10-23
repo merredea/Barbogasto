@@ -13,6 +13,7 @@ export function HomePage() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [expenses, setExpenses] = useState<Expense[] | null>(null);
   const [reminder, setReminder] = useState("");
+  const [reminderLoaded, setReminderLoaded] = useState(false);
 
   useEffect(() => {
     api.balances().then((data) => {
@@ -21,16 +22,34 @@ export function HomePage() {
       setBalancesLoaded(true);
     }).catch(() => setBalancesLoaded(true));
     api.expenses(5).then((data) => setExpenses(data.expenses)).catch(() => setExpenses([]));
-    api.reminder().then((data) => setReminder(data.show ? data.message : "")).catch(() => undefined);
+    api.reminder().then((data) => {
+      setReminder(data.show ? data.message : "");
+      setReminderLoaded(true);
+    }).catch(() => setReminderLoaded(true));
   }, [me?.id]);
 
   const net = mine?.netCents ?? 0;
   const today = formatSpanishDate(todayIsoLocal());
   const sentence = net < 0 ? `Debes ${formatCents(-net)}` : net > 0 ? `Te deben ${formatCents(net)}` : "Estás al día";
   const tone = net > 0 ? "text-gain" : net < 0 ? "text-clay" : "text-ink";
+  const ready = balancesLoaded && expenses !== null && reminderLoaded;
+
+  if (!ready) {
+    return (
+      <div className="space-y-8" role="status" aria-label="Cargando">
+        <div className="space-y-2" aria-hidden="true">
+          <div className="skeleton h-4 w-32" />
+          <div className="skeleton h-9 w-48" />
+        </div>
+        <div className="skeleton h-[84px]" aria-hidden="true" />
+        <div className="skeleton h-12" aria-hidden="true" />
+        <PageLoading rows={3} />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
+    <div className="page-enter space-y-8">
       <header>
         <p className="text-sm text-muted">{today}</p>
         <h1 className="text-[32px] font-semibold leading-tight">Hola, {me?.name.split(" ")[0]}</h1>
@@ -45,23 +64,15 @@ export function HomePage() {
         </Banner>
       )}
       <section>
-        {balancesLoaded ? (
-          <>
-            <p className={`text-base ${tone}`}>{sentence}</p>
-            <p className={`mt-1 text-5xl font-semibold tracking-tight ${tone}`}>{formatSignedCents(net)}</p>
-          </>
-        ) : (
-          <div className="skeleton h-[84px]" aria-hidden="true" />
-        )}
+        <p className={`text-base ${tone}`}>{sentence}</p>
+        <p className={`mt-1 text-5xl font-semibold tracking-tight ${tone}`}>{formatSignedCents(net)}</p>
       </section>
       <Link to="/gastos/nuevo" className="flex h-12 items-center justify-center rounded-full bg-accent text-base font-semibold text-white">
         Añadir gasto
       </Link>
       <section>
         <h2 className="mb-3 text-xl font-semibold tracking-tight">Transferencias sugeridas</h2>
-        {!balancesLoaded ? (
-          <PageLoading rows={1} />
-        ) : transfers.length === 0 ? (
+        {transfers.length === 0 ? (
           <p className="rounded-2xl bg-card px-4 py-3 text-sm">No hay deudas pendientes.</p>
         ) : (
           <ul className="space-y-2">
@@ -79,7 +90,7 @@ export function HomePage() {
           <h2 className="text-xl font-semibold tracking-tight">Últimos gastos</h2>
           <Link className="text-sm font-semibold underline underline-offset-2" to="/gastos">Ver historial</Link>
         </div>
-        {expenses === null ? <PageLoading rows={2} /> : <ExpenseList expenses={expenses} empty="Todavía no hay gastos." />}
+        <ExpenseList expenses={expenses} empty="Todavía no hay gastos." />
       </section>
     </div>
   );

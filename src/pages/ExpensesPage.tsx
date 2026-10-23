@@ -9,8 +9,17 @@ export function ExpensesPage() {
     api.expenses(10000).then((data) => setExpenses(data.expenses)).catch(() => setExpenses([]));
   }, []);
 
+  if (expenses === null) {
+    return (
+      <div className="space-y-5" role="status" aria-label="Cargando">
+        <div className="skeleton h-8 w-40" aria-hidden="true" />
+        <PageLoading rows={6} />
+      </div>
+    );
+  }
+
   const groups = new Map<string, Expense[]>();
-  for (const expense of expenses ?? []) {
+  for (const expense of expenses) {
     const month = expense.expenseDate.slice(0, 7);
     const list = groups.get(month) ?? [];
     list.push(expense);
@@ -18,16 +27,12 @@ export function ExpensesPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="page-enter space-y-5">
       <header>
         <h1 className="text-2xl font-semibold">Historial</h1>
-        {expenses !== null && (
-          <p className="text-sm text-muted">{expenses.length === 1 ? "1 gasto" : `${expenses.length} gastos`}</p>
-        )}
+        <p className="text-sm text-muted">{expenses.length === 1 ? "1 gasto" : `${expenses.length} gastos`}</p>
       </header>
-      {expenses === null ? (
-        <PageLoading rows={6} />
-      ) : expenses.length === 0 ? (
+      {expenses.length === 0 ? (
         <ExpenseList expenses={[]} empty="Todavía no hay gastos." />
       ) : (
         [...groups.entries()].map(([month, monthExpenses]) => (
