@@ -24,9 +24,6 @@ export async function register(ctx: AppCtx): Promise<Response> {
     currency: string;
     timezone: string;
   }>();
-  if (group && !inviteToken) {
-    throw new ApiError(403, "invitacion", "El grupo ya existe. Necesitas un enlace de invitación.");
-  }
   if (!group && inviteToken) throw new ApiError(400, "invitacion", "Esta invitación no es válida.");
 
   const now = new Date().toISOString();
@@ -45,7 +42,7 @@ export async function register(ctx: AppCtx): Promise<Response> {
           .bind(userId, email, name, passwordHash, now),
         ctx.db
           .prepare(
-            `INSERT INTO groups (id, singleton, name, currency, timezone, created_at) VALUES (?, 1, 'Gastos compartidos', 'EUR', 'Europe/Madrid', ?)`,
+            `INSERT INTO groups (id, singleton, name, currency, timezone, created_at) VALUES (?, 1, 'Barbogastos', 'EUR', 'Europe/Madrid', ?)`,
           )
           .bind(groupId, now),
         ctx.db
@@ -60,7 +57,34 @@ export async function register(ctx: AppCtx): Promise<Response> {
       if (message.toLowerCase().includes("email")) throw new ApiError(409, "email", "Ya hay una cuenta con ese email.");
       throw new ApiError(403, "invitacion", "El grupo ya existe. Necesitas un enlace de invitación.");
     }
-    return json(publicUser(sessionFrom(userId, email, name, "owner", groupId, "Gastos compartidos", "EUR", "Europe/Madrid")), 201, {
+    return json(publicUser(sessionFrom(userId, email, name, "owner", groupId, "Barbogastos", "EUR", "Europe/Madrid")), 201, {
+      "Set-Cookie": sessionCookie(token, ctx.request, SESSION_SECONDS),
+    });
+  }
+
+  if (!inviteToken) {
+    // Registro abierto: la cuenta entra directamente en la comunidad única.
+    try {
+      await ctx.db
+        .prepare(`INSERT INTO users (id, email, name, password_hash, push_enabled, created_at) VALUES (?, ?, ?, ?, 0, ?)`)
+        .bind(userId, email, name, passwordHash, now)
+        .run();
+      const sessionId = crypto.randomUUID();
+      await ctx.db.batch([
+        ctx.db
+          .prepare(`INSERT INTO group_members (group_id, user_id, role, created_at) VALUES (?, ?, 'member', ?)`)
+          .bind(group.id, userId, now),
+        ctx.db
+          .prepare(`INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`)
+          .bind(sessionId, userId, tokenHash, expires(now), now),
+      ]);
+    } catch (error) {
+      await ctx.db.prepare(`DELETE FROM users WHERE id = ?`).bind(userId).run();
+      const message = error instanceof Error ? error.message : "";
+      if (message.toLowerCase().includes("email")) throw new ApiError(409, "email", "Ya hay una cuenta con ese email.");
+      throw error;
+    }
+    return json(publicUser(sessionFrom(userId, email, name, "member", group.id, group.name, group.currency, group.timezone)), 201, {
       "Set-Cookie": sessionCookie(token, ctx.request, SESSION_SECONDS),
     });
   }
