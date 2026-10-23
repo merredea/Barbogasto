@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Expense } from "../lib/api";
+import { PageLoading } from "../components/ui";
 import { ExpenseList } from "./HomePage";
 
 export function ExpensesPage() {
@@ -25,7 +26,7 @@ export function ExpensesPage() {
         )}
       </header>
       {expenses === null ? (
-        <p className="text-sm text-muted">Cargando…</p>
+        <PageLoading rows={6} />
       ) : expenses.length === 0 ? (
         <ExpenseList expenses={[]} empty="Todavía no hay gastos." />
       ) : (

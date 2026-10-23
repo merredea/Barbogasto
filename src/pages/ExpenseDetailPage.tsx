@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { formatCents, formatQuantity } from "../../shared/money";
 import { formatSpanishDate, joinNames } from "../../shared/text";
 import { ApiError, api, type Expense, type ExpenseItem } from "../lib/api";
-import { Banner, SecondaryButton } from "../components/ui";
+import { Banner, PageLoading, SecondaryButton } from "../components/ui";
 
 export function ExpenseDetailPage() {
   const { id = "" } = useParams();
@@ -27,7 +27,7 @@ export function ExpenseDetailPage() {
     }
   }
 
-  if (!expense) return <p className="text-sm text-muted">{error || "Cargando…"}</p>;
+  if (!expense) return error ? <p className="text-sm text-muted">{error}</p> : <PageLoading rows={3} />;
   return (
     <div className="space-y-4">
       <Link to="/gastos" className="text-sm font-semibold text-pine">Volver</Link>
