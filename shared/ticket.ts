@@ -1,4 +1,5 @@
 import { isIsoDate } from "./dates";
+import { allocateByWeights } from "./money";
 import type { ItemKind } from "./expense";
 
 export interface TicketLine {
@@ -74,10 +75,24 @@ export function normalizeTicket(raw: unknown): TicketDraft {
   const tip = readCents(source.tipCents);
   const total = readCents(source.totalCents);
 
-  // Los precios de línea se guardan tal como se pagan, con IVA incluido, y el total es el del
-  // ticket. El IVA nunca crea una línea extra: taxCents queda solo como información. Si una
-  // factura trae precios sin IVA y lo suma al final, la diferencia entre las líneas y el total
-  // se reparte al confirmar el gasto (proporcional a lo pedido o a mano).
+  // Los precios de línea se guardan con IVA incluido y el total es el del ticket. El IVA nunca
+  // crea una línea extra: taxCents queda solo como información. Si el ticket suma el impuesto
+  // al final (precios sin IVA, típico de facturas), se reparte proporcionalmente entre las
+  // líneas para que cada una muestre su precio final y la suma siga siendo el total.
+  const linesComplete = items.every((item) => item.lineCents != null);
+  if (tax.value != null && tax.value !== 0 && total.value != null && linesComplete && items.length > 0) {
+    const extrasSum = (discount.value != null ? -Math.abs(discount.value) : 0) + (tip.value ?? 0);
+    const productSum = items.reduce((acc, item) => acc + (item.lineCents ?? 0), 0);
+    if (productSum + extrasSum + tax.value === total.value) {
+      const shares = allocateByWeights(tax.value, items.map((item) => Math.max(0, item.lineCents ?? 0)));
+      items.forEach((item, index) => {
+        item.lineCents = (item.lineCents ?? 0) + shares[index];
+        item.unitPriceCents = item.quantityMillis != null ? Math.round((item.lineCents * 1000) / item.quantityMillis) : null;
+        item.needsReview = true;
+      });
+      warnings.push("El ticket sumaba el IVA al final: se ha repartido entre las líneas para mostrar el precio final de cada una. Revísalo.");
+    }
+  }
   if (discount.value != null && discount.value !== 0) {
     pushMoneyLine(items, "Descuento", -Math.abs(discount.value), "discount", discount.review);
   }
