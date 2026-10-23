@@ -55,12 +55,13 @@ describe("ticket", () => {
     expect(draft.warnings.some((warning) => warning.includes("no coincide"))).toBe(false);
   });
 
-  it("reparte el IVA entre las líneas cuando el ticket lo suma al final", () => {
+  it("reparte el IVA entre las líneas cuando el ticket declara un único tipo", () => {
     const draft = normalizeTicket({
       items: [
         { name: "Menú", quantityMillis: 1000, unitPriceCents: 333, lineCents: 333, confident: true },
         { name: "Café", quantityMillis: 1000, unitPriceCents: 667, lineCents: 667, confident: true },
       ],
+      singleTaxRatePercent: 21,
       taxCents: 210,
       totalCents: 1210,
       totalConfident: true,
@@ -102,6 +103,32 @@ describe("ticket", () => {
     expect(draft.items.map((item) => item.lineCents)).toEqual([1000, 1000]);
     expect(draft.items.every((item) => item.needsReview)).toBe(true);
     expect(draft.warnings.some((warning) => warning.includes("no se puede saber el tipo"))).toBe(true);
+  });
+
+  it("no deduce un tipo único de la cuota total: una mezcla puede dar el mismo promedio", () => {
+    const draft = normalizeTicket({
+      items: [
+        { name: "Menú", lineCents: 333, confident: true },
+        { name: "Café", lineCents: 667, confident: true },
+      ],
+      taxCents: 210,
+      totalCents: 1210,
+      totalConfident: true,
+    });
+    expect(draft.items.map((item) => item.lineCents)).toEqual([333, 667]);
+    expect(draft.items.every((item) => item.needsReview)).toBe(true);
+    expect(draft.warnings.some((warning) => warning.includes("no se puede saber el tipo"))).toBe(true);
+  });
+
+  it("acepta tipos de IVA fuera de los habituales", () => {
+    const draft = normalizeTicket({
+      items: [{ name: "Libro", lineCents: 2000, taxRatePercent: 5.5, confident: true }],
+      taxCents: 110,
+      totalCents: 2110,
+      totalConfident: true,
+    });
+    expect(draft.items[0].lineCents).toBe(2110);
+    expect(draft.warnings.some((warning) => warning.includes("aplicado su tipo"))).toBe(true);
   });
 
   it("descarta importes que no sean céntimos enteros", () => {
