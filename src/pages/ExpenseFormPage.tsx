@@ -7,6 +7,7 @@ import type { TicketDraft } from "../../shared/ticket";
 import { ApiError, api, type Member } from "../lib/api";
 import { prepareImage } from "../lib/image";
 import { Banner, Field, PageLoading, PrimaryButton, SecondaryButton, controlClass } from "../components/ui";
+import { ScanOverlay, type ScanStage } from "../components/ScanOverlay";
 import { useSession } from "../session";
 
 interface LineState {
@@ -47,6 +48,7 @@ export function ExpenseFormPage() {
   const [pending, setPending] = useState(false);
   const [reconcile, setReconcile] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [scan, setScan] = useState<{ stage: ScanStage; progress: number | null } | null>(null);
   const [loaded, setLoaded] = useState(!editing);
 
   useEffect(() => {
@@ -109,9 +111,15 @@ export function ExpenseFormPage() {
     if (!file) return;
     setPending(true);
     setError("");
+    setScan({ stage: "preparing", progress: null });
     try {
       const image = await prepareImage(file);
-      const draft = await api.scan(image, crypto.randomUUID());
+      setScan({ stage: "uploading", progress: null });
+      const draft = await api.scan(image, crypto.randomUUID(), {
+        onUploadProgress: (fraction) =>
+          setScan((current) => (current && current.stage === "uploading" ? { ...current, progress: fraction } : current)),
+        onReading: () => setScan((current) => (current ? { ...current, stage: "reading", progress: null } : current)),
+      });
       applyTicket(draft);
       setStep("details");
     } catch (caught) {
@@ -119,6 +127,7 @@ export function ExpenseFormPage() {
       setStep("details");
     } finally {
       setPending(false);
+      setScan(null);
     }
   }
 
@@ -232,6 +241,7 @@ export function ExpenseFormPage() {
     <div className="page-enter space-y-4">
       <h1 className="text-2xl font-semibold">{editing ? "Editar gasto" : "Añadir gasto"}</h1>
       {error && <Banner tone="error">{error}</Banner>}
+      {scan && <ScanOverlay stage={scan.stage} progress={scan.progress} />}
       {step === "choice" && (
         <div className="space-y-3">
           <label className="flex h-12 cursor-pointer items-center justify-center rounded-full bg-accent text-base font-semibold text-white">

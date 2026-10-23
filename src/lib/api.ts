@@ -113,6 +113,49 @@ async function request<T>(path: string, init: { method?: string; json?: unknown;
   return data as T;
 }
 
+export interface ScanHooks {
+  /** Progreso real de la subida (bytes), de 0 a 1. Puede no llegar nunca si el navegador no lo informa. */
+  onUploadProgress?: (fraction: number) => void;
+  /** La foto ya se ha enviado y el servidor está leyendo el ticket (fase sin progreso real). */
+  onReading?: () => void;
+}
+
+/**
+ * Sube el ticket con XMLHttpRequest porque fetch no expone el progreso de subida.
+ * Mantiene el mismo contrato de errores que request(): ApiError y aviso de sesión caducada.
+ */
+function scanRequest<T>(file: Blob, idempotencyKey: string, hooks?: ScanHooks): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/tickets/scan");
+    xhr.withCredentials = true;
+    xhr.timeout = 90_000; // Gemini puede tardar unos segundos; margen amplio pero finito
+    xhr.setRequestHeader("Idempotency-Key", idempotencyKey);
+    if (hooks?.onUploadProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) hooks.onUploadProgress?.(Math.min(1, event.loaded / event.total));
+      };
+    }
+    xhr.upload.onload = () => hooks?.onReading?.();
+    xhr.onload = () => {
+      let data: { error?: string; message?: string } = {};
+      try {
+        data = xhr.responseText ? (JSON.parse(xhr.responseText) as typeof data) : {};
+      } catch {
+        data = {};
+      }
+      if (xhr.status === 401) onUnauthorized();
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data as T);
+      else reject(new ApiError(xhr.status, data.error ?? "error", data.message ?? "No se ha podido completar la operación."));
+    };
+    xhr.onerror = () => reject(new ApiError(0, "red", "No se ha podido conectar. Comprueba tu conexión e inténtalo de nuevo."));
+    xhr.ontimeout = () => reject(new ApiError(0, "red", "La lectura del ticket está tardando demasiado. Inténtalo de nuevo."));
+    const form = new FormData();
+    form.append("image", file, "ticket.jpg");
+    xhr.send(form);
+  });
+}
+
 export const api = {
   me: () => request<Me>("/api/auth/me"),
   login: (email: string, password: string) => request<Me>("/api/auth/login", { json: { email, password } }),
@@ -133,11 +176,7 @@ export const api = {
   createSettlement: (body: unknown, idempotencyKey: string) =>
     request<{ id: string }>("/api/settlements", { json: body, idempotencyKey }),
   deleteSettlement: (id: string) => request<{ ok: boolean }>(`/api/settlements/${id}`, { method: "DELETE" }),
-  scan: (file: Blob, idempotencyKey: string) => {
-    const form = new FormData();
-    form.append("image", file, "ticket.jpg");
-    return request<TicketDraft>("/api/tickets/scan", { body: form, idempotencyKey });
-  },
+  scan: (file: Blob, idempotencyKey: string, hooks?: ScanHooks) => scanRequest<TicketDraft>(file, idempotencyKey, hooks),
   pushKey: () => request<{ publicKey: string | null }>("/api/push/key"),
   subscribe: (subscription: PushSubscriptionJSON) => request<{ ok: boolean }>("/api/push/subscribe", { json: subscription }),
   unsubscribe: () => request<{ ok: boolean }>("/api/push/subscribe", { method: "DELETE" }),
