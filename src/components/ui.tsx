@@ -35,5 +35,19 @@ export function Banner({ children, tone = "info" }: { children: ReactNode; tone?
 }
 
 export function Splash() {
-  return <div className="grid min-h-dvh place-items-center text-2xl font-semibold text-pine">Barbogasto</div>;
+  return (
+    <div className="grid min-h-dvh place-items-center">
+      <p className="splash-mark text-2xl font-semibold text-pine">Barbogasto</p>
+    </div>
+  );
+}
+
+export function PageLoading({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="space-y-2" role="status" aria-label="Cargando">
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className="skeleton h-[68px]" />
+      ))}
+    </div>
+  );
 }
