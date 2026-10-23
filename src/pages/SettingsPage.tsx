@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatSpanishDate } from "../../shared/text";
 import { ApiError, api, type Member } from "../lib/api";
-import { Banner, SecondaryButton } from "../components/ui";
+import { Banner, PageLoading, SecondaryButton } from "../components/ui";
 import { useSession } from "../session";
 
 export function SettingsPage() {
   const { me, setMe } = useSession();
   const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>([]);
+  const [membersLoaded, setMembersLoaded] = useState(false);
   const [invites, setInvites] = useState<{ id: string; expires_at: string; used_at: string | null }[]>([]);
+  const [invitesLoaded, setInvitesLoaded] = useState(false);
   const [link, setLink] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -17,8 +19,14 @@ export function SettingsPage() {
   const standalone = window.matchMedia("(display-mode: standalone)").matches || "standalone" in navigator && (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
   function load() {
-    api.members().then((data) => setMembers(data.members)).catch(() => undefined);
-    api.invites().then((data) => setInvites(data.invitations)).catch(() => undefined);
+    api.members().then((data) => {
+      setMembers(data.members);
+      setMembersLoaded(true);
+    }).catch(() => setMembersLoaded(true));
+    api.invites().then((data) => {
+      setInvites(data.invitations);
+      setInvitesLoaded(true);
+    }).catch(() => setInvitesLoaded(true));
   }
   useEffect(load, []);
 
@@ -66,8 +74,17 @@ export function SettingsPage() {
     setMessage("Notificaciones desactivadas. El aviso seguirá apareciendo en la aplicación a fin de mes.");
   }
 
+  if (!membersLoaded || !invitesLoaded) {
+    return (
+      <div className="space-y-5" role="status" aria-label="Cargando">
+        <div className="skeleton h-8 w-32" aria-hidden="true" />
+        <PageLoading rows={4} />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="page-enter space-y-5">
       <header>
         <h1 className="text-2xl font-semibold">Ajustes</h1>
         <p className="text-muted">{me?.name} · {me?.email}</p>
