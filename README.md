@@ -17,7 +17,7 @@ Aplicación web móvil para compartir los gastos de un único grupo. Cada gasto 
 
 El frontend (React, TypeScript, Vite) y la API (Pages Functions) viven en este repositorio y se despliegan juntos en Cloudflare Pages. La base de datos es D1.
 
-Pages Functions no puede ejecutar Cron Triggers. El recordatorio push usa un Worker mínimo, `barbogasto-reminder`, con la misma base D1. Se despierta a las 07:00 UTC los días 28 a 31 y solo envía si, en la zona del grupo (Europa/Madrid por defecto), ese día es el último del mes. No hace falta ningún otro servicio.
+Pages Functions no puede ejecutar Cron Triggers. El recordatorio push usa un Worker mínimo, `barbogasto-reminder`, con la misma base D1. Se despierta a las 07:00 UTC los días 28 a 31 y solo envía si, en la zona del grupo (Europe/Madrid por defecto), ese día es el último del mes. No hace falta ningún otro servicio.
 
 ## Ejecutar en local
 
