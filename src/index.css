@@ -57,3 +57,74 @@ select,
 textarea {
   font-size: 16px;
 }
+
+/* Transiciones de página y estados de carga */
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: page-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  border-radius: 16px;
+  background: linear-gradient(90deg, #f1f1f1 25%, #e5e5e5 37%, #f1f1f1 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes splash-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.97);
+  }
+}
+
+.splash-mark {
+  animation: splash-pulse 1.6s ease-in-out infinite;
+}
+
+a,
+button {
+  transition:
+    opacity 140ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .skeleton,
+  .splash-mark {
+    animation: none;
+  }
+  a,
+  button {
+    transition: none;
+  }
+}
