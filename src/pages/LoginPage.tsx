@@ -27,7 +27,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell title="Entra en el grupo" subtitle="Los gastos solo los ve quien tiene cuenta.">
+    <AuthShell title="Entra en Barbogastos" subtitle="Los gastos solo los ve quien tiene cuenta.">
       <form className="space-y-4" onSubmit={submit}>
         {error && <Banner tone="error">{error}</Banner>}
         <Field label="Email">

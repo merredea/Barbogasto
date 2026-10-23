@@ -31,7 +31,7 @@ export function RegisterPage({ inviteToken = "" }: { inviteToken?: string }) {
   }
 
   return (
-    <AuthShell title={token ? "Únete al grupo" : "Crear el grupo"} subtitle={token ? "Esta invitación es de un solo uso." : "La primera cuenta crea el grupo compartido."}>
+    <AuthShell title={token ? "Únete a Barbogastos" : "Crear cuenta"} subtitle={token ? "Esta invitación es de un solo uso." : "Entrarás en la comunidad Barbogastos: verás todos los gastos apuntados hasta hoy y podrás añadir los tuyos."}>
       <form className="space-y-4" onSubmit={submit}>
         {error && <Banner tone="error">{error}</Banner>}
         <Field label="Nombre">
