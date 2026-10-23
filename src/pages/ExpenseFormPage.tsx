@@ -29,6 +29,7 @@ export function ExpenseFormPage() {
   const { me } = useSession();
   const [step, setStep] = useState<Step>(editing ? "details" : "choice");
   const [members, setMembers] = useState<Member[]>([]);
+  const [membersLoaded, setMembersLoaded] = useState(false);
   const [description, setDescription] = useState("");
   const [merchant, setMerchant] = useState("");
   const [note, setNote] = useState("");
@@ -54,7 +55,11 @@ export function ExpenseFormPage() {
         setParticipantIds(data.members.map((member) => member.id));
         setPayerId((current) => current || me?.id || data.members[0]?.id || "");
       }
-    }).catch(() => setError("No se han podido cargar las personas."));
+      setMembersLoaded(true);
+    }).catch(() => {
+      setMembersLoaded(true);
+      setError("No se han podido cargar las personas.");
+    });
   }, [editing, me?.id]);
 
   useEffect(() => {
@@ -216,10 +221,10 @@ export function ExpenseFormPage() {
     }
   }
 
-  if (!loaded) return error ? <p className="text-sm text-muted">{error}</p> : <PageLoading rows={5} />;
+  if (!loaded || !membersLoaded) return error ? <p className="text-sm text-muted">{error}</p> : <PageLoading rows={5} />;
 
   return (
-    <div className="space-y-4">
+    <div className="page-enter space-y-4">
       <h1 className="text-2xl font-semibold">{editing ? "Editar gasto" : "Añadir gasto"}</h1>
       {error && <Banner tone="error">{error}</Banner>}
       {step === "choice" && (
