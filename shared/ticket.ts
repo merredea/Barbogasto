@@ -1,5 +1,4 @@
 import { isIsoDate } from "./dates";
-import { allocateByWeights } from "./money";
 import type { ItemKind } from "./expense";
 
 export interface TicketLine {
@@ -47,6 +46,7 @@ export function normalizeTicket(raw: unknown): TicketDraft {
   if (currency && currency !== "EUR") warnings.push("El ticket no está en euros. Escribe el importe en euros antes de guardar.");
 
   const items: TicketLine[] = [];
+  const rates: (number | null)[] = [];
   if (Array.isArray(source.items)) {
     for (const entry of source.items.slice(0, 80)) {
       if (!entry || typeof entry !== "object") continue;
@@ -56,6 +56,7 @@ export function normalizeTicket(raw: unknown): TicketDraft {
       const line = readCents(item.lineCents);
       const unit = readCents(item.unitPriceCents);
       const quantity = readQuantity(item.quantityMillis);
+      rates.push(readTaxRate(item.taxRatePercent));
       const needsReview = item.confident === false || line.review || unit.review || quantity.review;
       if (line.review || unit.review || quantity.review) warnings.push(`Revisa «${name}».`);
       items.push({
@@ -77,20 +78,36 @@ export function normalizeTicket(raw: unknown): TicketDraft {
 
   // Los precios de línea se guardan con IVA incluido y el total es el del ticket. El IVA nunca
   // crea una línea extra: taxCents queda solo como información. Si el ticket suma el impuesto
-  // al final (precios sin IVA, típico de facturas), se reparte proporcionalmente entre las
-  // líneas para que cada una muestre su precio final y la suma siga siendo el total.
+  // al final (precios sin IVA, típico de facturas), solo se calcula el precio final cuando el
+  // tipo de cada línea es seguro (tipo explícito en el ticket o un único tipo que cuadra con
+  // la cuota total). Con varios tipos sin identificar no se reparte nada a ciegas: las líneas
+  // quedan sin IVA, marcadas para revisar, y la diferencia se reparte al confirmar el gasto.
   const linesComplete = items.every((item) => item.lineCents != null);
   if (tax.value != null && tax.value !== 0 && total.value != null && linesComplete && items.length > 0) {
     const extrasSum = (discount.value != null ? -Math.abs(discount.value) : 0) + (tip.value ?? 0);
     const productSum = items.reduce((acc, item) => acc + (item.lineCents ?? 0), 0);
-    if (productSum + extrasSum + tax.value === total.value) {
-      const shares = allocateByWeights(tax.value, items.map((item) => Math.max(0, item.lineCents ?? 0)));
-      items.forEach((item, index) => {
-        item.lineCents = (item.lineCents ?? 0) + shares[index];
-        item.unitPriceCents = item.quantityMillis != null ? Math.round((item.lineCents * 1000) / item.quantityMillis) : null;
-        item.needsReview = true;
-      });
-      warnings.push("El ticket sumaba el IVA al final: se ha repartido entre las líneas para mostrar el precio final de cada una. Revísalo.");
+    if (productSum > 0 && productSum + extrasSum + tax.value === total.value) {
+      const singleRate = [0, 4, 10, 21].find((rate) => Math.round((productSum * rate) / 100) === tax.value) ?? null;
+      const allRated = items.length > 0 && rates.every((rate) => rate != null);
+      if (allRated || singleRate != null) {
+        const rateOf = (index: number) => rates[index] ?? singleRate ?? 0;
+        const gross = items.map((item, index) => Math.round(((item.lineCents ?? 0) * (100 + rateOf(index))) / 100));
+        const residual = total.value - extrasSum - gross.reduce((acc, value) => acc + value, 0);
+        if (Math.abs(residual) <= items.length) {
+          const maxIndex = gross.indexOf(Math.max(...gross));
+          gross[maxIndex] += residual; // Redondeo del propio ticket: va a la línea mayor.
+          items.forEach((item, index) => {
+            item.lineCents = gross[index];
+            item.unitPriceCents = item.quantityMillis != null ? Math.round((gross[index] * 1000) / item.quantityMillis) : null;
+            item.needsReview = true;
+          });
+          warnings.push("El ticket sumaba el IVA al final: se ha aplicado su tipo a cada línea para mostrar el precio final. Revísalo.");
+        } else {
+          markTaxUncertain(items, warnings);
+        }
+      } else {
+        markTaxUncertain(items, warnings);
+      }
     }
   }
   if (discount.value != null && discount.value !== 0) {
@@ -133,6 +150,18 @@ function pushMoneyLine(items: TicketLine[], name: string, cents: number | null, 
     kind,
     needsReview: review,
   });
+}
+
+function markTaxUncertain(items: TicketLine[], warnings: string[]): void {
+  items.forEach((item) => {
+    item.needsReview = true;
+  });
+  warnings.push("El ticket suma el IVA al final y no se puede saber el tipo de cada línea: los precios no incluyen IVA. La diferencia se reparte al confirmar el gasto.");
+}
+
+function readTaxRate(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 30) return value;
+  return null;
 }
 
 function readCents(value: unknown): { value: number | null; review: boolean } {
