@@ -6,7 +6,7 @@ import { todayIsoLocal } from "../../shared/text";
 import type { TicketDraft } from "../../shared/ticket";
 import { ApiError, api, type Member } from "../lib/api";
 import { prepareImage } from "../lib/image";
-import { Banner, Field, PrimaryButton, SecondaryButton, controlClass } from "../components/ui";
+import { Banner, Field, PageLoading, PrimaryButton, SecondaryButton, controlClass } from "../components/ui";
 import { useSession } from "../session";
 
 interface LineState {
@@ -216,7 +216,7 @@ export function ExpenseFormPage() {
     }
   }
 
-  if (!loaded) return <p className="text-sm text-muted">{error || "Cargando…"}</p>;
+  if (!loaded) return error ? <p className="text-sm text-muted">{error}</p> : <PageLoading rows={5} />;
 
   return (
     <div className="space-y-4">
