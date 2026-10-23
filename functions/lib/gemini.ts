@@ -10,6 +10,7 @@ date es YYYY-MM-DD o null. currency es el código ISO de 3 letras o null.
 items incluye solo productos: ni el total, ni el desglose de IVA u otros impuestos.
 lineCents es el importe final de la línea tal como se paga, con el IVA ya incluido cuando el ticket lo incluye (lo habitual en España).
 totalCents es el importe total final del ticket, lo que se paga.
+taxRatePercent es el tipo de IVA de la línea si el ticket lo muestra junto a ella (0, 4, 10 o 21); null si no se ve.
 taxCents es solo informativo: la app nunca lo suma como una línea aparte. En tickets con IVA incluido en los precios (lo habitual en España) usa null aunque el ticket muestre un desglose de IVA; en facturas con base imponible + IVA, indica el IVA total.
 discountCents y tipCents son importes positivos en céntimos, o null si no aparecen.
 unreadable es una lista corta de lo que no has podido leer.
@@ -23,7 +24,7 @@ Formato:
   "dateConfident": boolean,
   "currency": string | null,
   "currencyConfident": boolean,
-  "items": [{ "name": string, "quantityMillis": number | null, "unitPriceCents": number | null, "lineCents": number | null, "confident": boolean }],
+  "items": [{ "name": string, "quantityMillis": number | null, "unitPriceCents": number | null, "lineCents": number | null, "taxRatePercent": number | null, "confident": boolean }],
   "subtotalCents": number | null,
   "taxCents": number | null,
   "discountCents": number | null,
