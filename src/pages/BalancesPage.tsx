@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { formatCents, formatSignedCents } from "../../shared/money";
 import { todayIsoLocal } from "../../shared/text";
 import { ApiError, api, type BalanceMember, type Transfer } from "../lib/api";
-import { Banner } from "../components/ui";
+import { Banner, PageLoading } from "../components/ui";
 import { useSession } from "../session";
 
 export function BalancesPage() {
@@ -11,6 +11,8 @@ export function BalancesPage() {
   const [members, setMembers] = useState<BalanceMember[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [reminder, setReminder] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [reminderLoaded, setReminderLoaded] = useState(false);
   const [error, setError] = useState("");
   const [paying, setPaying] = useState<string | null>(null);
 
@@ -18,12 +20,19 @@ export function BalancesPage() {
     return api.balances().then((data) => {
       setMembers(data.members);
       setTransfers(data.transfers);
+      setLoaded(true);
     });
   }
 
   useEffect(() => {
-    load().catch(() => setError("No se han podido cargar los saldos."));
-    api.reminder().then((data) => setReminder(data.show ? data.message : "")).catch(() => undefined);
+    load().catch(() => {
+      setLoaded(true);
+      setError("No se han podido cargar los saldos.");
+    });
+    api.reminder().then((data) => {
+      setReminder(data.show ? data.message : "");
+      setReminderLoaded(true);
+    }).catch(() => setReminderLoaded(true));
   }, [me?.id]);
 
   async function markPaid(transfer: Transfer) {
@@ -49,8 +58,17 @@ export function BalancesPage() {
     }
   }
 
+  if (!loaded || !reminderLoaded) {
+    return (
+      <div className="space-y-5" role="status" aria-label="Cargando">
+        <div className="skeleton h-8 w-32" aria-hidden="true" />
+        <PageLoading rows={4} />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="page-enter space-y-5">
       <header className="flex items-start justify-between gap-3">
         <h1 className="text-2xl font-semibold">Saldos</h1>
         <Link className="text-sm font-semibold text-pine" to="/ajustes">Ajustes</Link>
