@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Splash } from "./components/ui";
 import { BalancesPage } from "./pages/BalancesPage";
@@ -14,12 +15,18 @@ import { useSession } from "./session";
 
 export function App() {
   const { me, loading } = useSession();
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
   if (loading) return <Splash />;
   return (
     <Routes>
-      <Route path="/login" element={me ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/registro" element={me ? <Navigate to="/" replace /> : <RegisterPage />} />
-      <Route path="/invitar/:token" element={<InvitePage />} />
+      <Route path="/login" element={me ? <Navigate to="/" replace /> : <div className="page-enter"><LoginPage /></div>} />
+      <Route path="/registro" element={me ? <Navigate to="/" replace /> : <div className="page-enter"><RegisterPage /></div>} />
+      <Route path="/invitar/:token" element={<div className="page-enter"><InvitePage /></div>} />
       <Route element={me ? <Layout /> : <Navigate to="/login" replace />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/gastos" element={<ExpensesPage />} />
