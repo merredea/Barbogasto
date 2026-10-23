@@ -4,7 +4,7 @@ Aplicación web móvil para compartir los gastos de un único grupo. Cada gasto 
 
 ## Qué está implementado
 
-- Cuenta con email y contraseña, sesión en cookie y un solo grupo.
+- Cuenta con email y contraseña, sesión en cookie y una única comunidad, Barbogastos: quien se registra entra en ella directamente.
 - Invitaciones de un solo uso, válidas 7 días.
 - Gastos manuales y lectura de tickets con Gemini. La foto no se guarda.
 - Reparto a partes iguales o por líneas, con impuestos proporcionales o manuales.
@@ -38,7 +38,7 @@ npm run dev
 
 Abre http://127.0.0.1:5173. La API local escucha en el puerto 8788 y Vite le reenvía `/api`.
 
-La primera cuenta crea el grupo. Las siguientes necesitan un enlace creado en Ajustes.
+La primera cuenta crea la comunidad. Las siguientes se unen a ella al registrarse, sin invitación: ven todos los gastos ya apuntados y pueden añadir los suyos. Los enlaces de invitación de Ajustes siguen funcionando, pero ya no hacen falta.
 
 ## Variables y secretos
 
