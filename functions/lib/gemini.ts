@@ -2,16 +2,16 @@ import { normalizeTicket, type TicketDraft } from "../../shared/ticket";
 import type { Env } from "../env";
 import { ApiError } from "./http";
 
-const PROMPT = `Lee esta fotografÃ­a de un ticket o factura y responde solo JSON.
+const PROMPT = `Lee esta fotografía de un ticket o factura y responde solo JSON.
 No inventes datos. Si un campo no se lee con seguridad, usa null y marca el booleano *Confident correspondiente como false.
-Los importes van en cÃ©ntimos enteros: 12,50 euros son 1250. Nunca uses decimales.
+Los importes van en céntimos enteros: 12,50 euros son 1250. Nunca uses decimales.
 quantityMillis es la cantidad por 1000 (una unidad = 1000). Si no aparece, null.
-date es YYYY-MM-DD o null. currency es el cÃ³digo ISO de 3 letras o null.
+date es YYYY-MM-DD o null. currency es el código ISO de 3 letras o null.
 items incluye solo productos: ni el total, ni el desglose de IVA u otros impuestos.
-lineCents es el importe final de la lÃ­nea tal como se paga, con el IVA ya incluido cuando el ticket lo incluye (lo habitual en EspaÃ±a).
+lineCents es el importe final de la línea tal como se paga, con el IVA ya incluido cuando el ticket lo incluye (lo habitual en España).
 totalCents es el importe total final del ticket, lo que se paga.
-taxCents es solo informativo: la app nunca lo suma como una lÃ­nea aparte. En tickets con IVA incluido en los precios (lo habitual en EspaÃ±a) usa null aunque el ticket muestre un desglose de IVA; en facturas con base imponible + IVA, indica el IVA total.
-discountCents y tipCents son importes positivos en cÃ©ntimos, o null si no aparecen.
+taxCents es solo informativo: la app nunca lo suma como una línea aparte. En tickets con IVA incluido en los precios (lo habitual en España) usa null aunque el ticket muestre un desglose de IVA; en facturas con base imponible + IVA, indica el IVA total.
+discountCents y tipCents son importes positivos en céntimos, o null si no aparecen.
 unreadable es una lista corta de lo que no has podido leer.
 Si la imagen no es un ticket, deja los valores a null.
 
@@ -35,7 +35,7 @@ Formato:
 
 export async function readTicket(env: Env, bytes: Uint8Array, mime: string): Promise<TicketDraft> {
   if (!env.GEMINI_API_KEY) {
-    throw new ApiError(503, "ia_no_disponible", "La lectura de tickets no estÃ¡ configurada. Puedes introducir el gasto manualmente.");
+    throw new ApiError(503, "ia_no_disponible", "La lectura de tickets no está configurada. Puedes introducir el gasto manualmente.");
   }
   const model = env.GEMINI_MODEL || "gemini-3.5-flash-lite";
   let base64 = "";
