@@ -78,19 +78,21 @@ export function normalizeTicket(raw: unknown): TicketDraft {
 
   // Los precios de línea se guardan con IVA incluido y el total es el del ticket. El IVA nunca
   // crea una línea extra: taxCents queda solo como información. Si el ticket suma el impuesto
-  // al final (precios sin IVA, típico de facturas), solo se calcula el precio final cuando el
-  // tipo de cada línea es seguro (tipo explícito en el ticket o un único tipo que cuadra con
-  // la cuota total). Con varios tipos sin identificar no se reparte nada a ciegas: las líneas
-  // quedan sin IVA, marcadas para revisar, y la diferencia se reparte al confirmar el gasto.
+  // al final (precios sin IVA, típico de facturas), solo se calcula el precio final cuando hay
+  // evidencia explícita del tipo: un taxRatePercent por línea o un singleTaxRatePercent que el
+  // propio ticket declara para todas las líneas. Que la cuota total cuadre con un tipo no es
+  // evidencia: una mezcla de tipos puede dar el mismo promedio. Sin evidencia no se reparte
+  // nada a ciegas: las líneas quedan sin IVA, marcadas para revisar, y la diferencia se reparte
+  // al confirmar el gasto.
   const linesComplete = items.every((item) => item.lineCents != null);
   if (tax.value != null && tax.value !== 0 && total.value != null && linesComplete && items.length > 0) {
     const extrasSum = (discount.value != null ? -Math.abs(discount.value) : 0) + (tip.value ?? 0);
     const productSum = items.reduce((acc, item) => acc + (item.lineCents ?? 0), 0);
     if (productSum > 0 && productSum + extrasSum + tax.value === total.value) {
-      const singleRate = [0, 4, 10, 21].find((rate) => Math.round((productSum * rate) / 100) === tax.value) ?? null;
+      const explicitSingleRate = readTaxRate(source.singleTaxRatePercent);
       const allRated = items.length > 0 && rates.every((rate) => rate != null);
-      if (allRated || singleRate != null) {
-        const rateOf = (index: number) => rates[index] ?? singleRate ?? 0;
+      if (allRated || explicitSingleRate != null) {
+        const rateOf = (index: number) => rates[index] ?? explicitSingleRate ?? 0;
         const gross = items.map((item, index) => Math.round(((item.lineCents ?? 0) * (100 + rateOf(index))) / 100));
         const residual = total.value - extrasSum - gross.reduce((acc, value) => acc + value, 0);
         if (Math.abs(residual) <= items.length) {
@@ -160,7 +162,8 @@ function markTaxUncertain(items: TicketLine[], warnings: string[]): void {
 }
 
 function readTaxRate(value: unknown): number | null {
-  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 30) return value;
+  // Cualquier tipo es válido (0, 4, 5.5, 7, 10, 21, ...); no se limita a los habituales de España.
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100) return value;
   return null;
 }
 
